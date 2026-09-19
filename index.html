@@ -4,10 +4,149 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Concours Mohammed</title>
+  <style>
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      margin: 20px;
+      background: #f5f5f5;
+    }
+    h1 {
+      text-align: center;
+      color: #1a1a1a;
+    }
+    .container {
+      max-width: 600px;
+      margin: 0 auto;
+      background: white;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    }
+    .timer {
+      font-size: 20px;
+      text-align: center;
+      margin: 15px 0;
+      font-weight: bold;
+      color: #d32f2f;
+    }
+    .question {
+      margin: 20px 0;
+    }
+    .question p {
+      font-weight: 600;
+      margin-bottom: 10px;
+    }
+    label {
+      display: block;
+      margin: 8px 0;
+      cursor: pointer;
+    }
+    button {
+      width: 100%;
+      padding: 12px;
+      background: #1976d2;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      font-size: 16px;
+      cursor: pointer;
+    }
+    button:disabled {
+      background: #90caf9;
+    }
+    .result {
+      text-align: center;
+      font-size: 18px;
+      margin-top: 20px;
+      font-weight: bold;
+    }
+  </style>
 </head>
 <body>
-  <h1>Concours Mohammed</h1>
-  <p>منصة للتحضير للمسابقات والامتحانات.</p>
-  <button>ابدأ الامتحان</button>
+  <div class="container">
+    <h1>Concours Mohammed</h1>
+    <p style="text-align:center;">منصة للتحضير للمسابقات والامتحانات.</p>
+
+    <div id="start-screen">
+      <button id="start-btn">ابدأ الامتحان</button>
+    </div>
+
+    <div id="exam-screen" style="display:none;">
+      <div class="timer" id="timer">01:00:00</div>
+
+      <div class="question">
+        <p>1. ما هي عاصمة موريتانيا؟</p>
+        <label><input type="radio" name="q1" value="a"> أ) نواذيبو</label>
+        <label><input type="radio" name="q1" value="b"> ب) نواكشوط</label>
+        <label><input type="radio" name="q1" value="c"> ج) كيفة</label>
+        <label><input type="radio" name="q1" value="d"> د) أطار</label>
+      </div>
+
+      <div class="question">
+        <p>2. كم يساوي 7 × 8؟</p>
+        <label><input type="radio" name="q2" value="a"> أ) 54</label>
+        <label><input type="radio" name="q2" value="b"> ب) 56</label>
+        <label><input type="radio" name="q2" value="c"> ج) 64</label>
+        <label><input type="radio" name="q2" value="d"> د) 48</label>
+      </div>
+
+      <button id="submit-btn">إرسال الإجابات</button>
+      <div class="result" id="result"></div>
+    </div>
+  </div>
+
+  <script>
+    const startBtn = document.getElementById('start-btn');
+    const submitBtn = document.getElementById('submit-btn');
+    const startScreen = document.getElementById('start-screen');
+    const examScreen = document.getElementById('exam-screen');
+    const timerEl = document.getElementById('timer');
+    const resultEl = document.getElementById('result');
+
+    let timeLeft = 3600; // 60 دقيقة بالثواني
+    let timerId = null;
+
+    startBtn.addEventListener('click', () => {
+      startScreen.style.display = 'none';
+      examScreen.style.display = 'block';
+      startTimer();
+    });
+
+    function startTimer() {
+      timerId = setInterval(() => {
+        timeLeft--;
+        const h = Math.floor(timeLeft / 3600);
+        const m = Math.floor((timeLeft % 3600) / 60);
+        const s = timeLeft % 60;
+        timerEl.textContent =
+          String(h).padStart(2, '0') + ':' +
+          String(m).padStart(2, '0') + ':' +
+          String(s).padStart(2, '0');
+
+        if (timeLeft <= 0) {
+          clearInterval(timerId);
+          submitExam();
+        }
+      }, 1000);
+    }
+
+    submitBtn.addEventListener('click', submitExam);
+
+    function submitExam() {
+      if (timerId) clearInterval(timerId);
+
+      const answers = {
+        q1: document.querySelector('input[name="q1"]:checked')?.value,
+        q2: document.querySelector('input[name="q2"]:checked')?.value
+      };
+
+      let score = 0;
+      if (answers.q1 === 'b') score++;
+      if (answers.q2 === 'b') score++;
+
+      resultEl.textContent = 'نتيجتك: ' + score + ' من 2';
+      submitBtn.disabled = true;
+    }
+  </script>
 </body>
 </html>
