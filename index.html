@@ -91,6 +91,38 @@ function finish(){
  reviews.innerHTML=html;
 }
 function goHome(){clearInterval(clock);exam.classList.add("hidden");result.classList.add("hidden");home.classList.remove("hidden");window.scrollTo(0,0)}
+async function uploadPDFs(){
+  const input=document.getElementById("pdfFiles");
+  const message=document.getElementById("uploadMessage");
+  const files=[...input.files];
+
+  if(!files.length){
+    message.textContent="اختر ملف PDF واحدًا على الأقل.";
+    return;
+  }
+
+  message.textContent="جارٍ رفع الملفات...";
+
+  let success=0;
+  let errors=[];
+
+  for(const file of files){
+    const name=file.name.replace(/[^a-zA-Z0-9._-]/g,"_");
+    const path="memo-"+Date.now()+"-"+Math.random().toString(36).slice(2,8)+"-"+name;
+
+    const {error}=await supabase.storage
+      .from("references")
+      .upload(path,file,{contentType:"application/pdf"});
+
+    if(error) errors.push(file.name+": "+error.message);
+    else success++;
+  }
+
+  input.value="";
+  message.textContent=errors.length
+    ? "تم رفع "+success+" ملف. خطأ: "+errors.join(" | ")
+    : "تم رفع "+success+" ملف/ملفات بنجاح.";
+}
 </script>
 </body>
 </html>
