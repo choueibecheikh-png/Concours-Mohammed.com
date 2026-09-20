@@ -22,6 +22,12 @@ body{margin:0;background:#f3f6fb;color:#102a43;font-family:Arial,sans-serif}head
 <option value="veryhard" selected>صعب جدًا</option>
 </select>
 <p>مستوى «صعب جدًا» هو المستوى الافتراضي.</p>
+<div style="margin:16px 0;padding:14px;border:2px dashed #155eef;border-radius:12px;background:#f8fbff">
+  <b>رفع مذكرات PDF</b>
+  <input id="pdfFiles" type="file" accept="application/pdf" multiple style="display:block;width:100%;margin:12px 0">
+  <button onclick="uploadPDFs()">رفع الملفات المختارة</button>
+  <p id="uploadMessage"></p>
+</div>
 <button onclick="start()">ابدأ الامتحان</button>
 </section>
 
