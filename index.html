@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Concours Mohammed — Préparation Inspecteurs des Impôts</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    :root{--b:#155eef;--d:#102a43;--bg:#f4f7fb;--g:#16803c;--r:#c92a2a;--o:#9a6700}
+    *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--d);font-family:Arial,sans-serif}
+    header{background:linear-gradient(135deg,#063a89,#155eef);color:#fff;padding:18px 14px}
+    .top,main{max-width:960px;margin:auto}.top{display:flex;justify-content:space-between;align-items:center;gap:10px}
+    h1{margin:0;font-size:20px}.sub{margin:5px 0 0;font-size:13px;opacity:.9}
+    button{border:0;border-radius:10px;padding:12px 14px;font-size:14px;font-weight:bold;cursor:pointer}
+    .lang{background:#fff;color:#06439b;padding:9px 12px}.card{background:#fff;margin:16px auto;padding:20px;border-radius:16px;box-shadow:0 8px 26px #102a4314}
+    main{padding:0 12px 45px}.hidden{display:none!important}.primary{background:var(--b);color:#fff;width:100%}.green{background:var(--g);color:#fff}
+    .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;text-align:center}.grid div{background:#eef4ff;padding:10px 5px;border-radius:10px;font-size:13px}
+    .upload{border:2px dashed #9bb8e7;border-radius:12px;padding:17px;margin:14px 0;background:#f8fbff}.upload input{width:100%;margin:10px 0}
+    #fileList{padding:0;margin:8px 0;list-style:none}.file{padding:9px;background:#f3f6fa;margin:6px 0;border-radius:8px;font-size:13px;direction:ltr;text-align:left}
+    #timer{font-size:23px;color:var(--r);direction:ltr}.progress{height:9px;background:#e7edf5;border-radius:9px;overflow:hidden;margin:15px 0}.progress i{display:block;height:100%;background:var(--b);width:0%}
+    .question{font-size:18px;font-weight:bold;line-height:1.65;text-align:left;direction:ltr}.hint{color:#667085;font-size:13px;margin:8px 0 13px}
+    label.option{display:block;direction:ltr;text-align:left;border:1px solid #d9e2f0;border-radius:10px;padding:12px;margin:8px 0;cursor:pointer}
+    label.option:has(input:checked){background:#eef4ff;border-color:var(--b)}input[type=checkbox],input[type=radio]{margin-right:10px;transform:scale(1.15)}
+    .nav{display:flex;gap:8px;margin-top:18px}.nav button{flex:1;background:#e8eff9;color:#123e75}.nav .green{background:var(--g);color:#fff}
+    .score{text-align:center;font-size:42px;font-weight:bold;color:var(--b);direction:ltr}.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;text-align:center}.stats div{background:#f3f6fa;padding:11px 4px;border-radius:10px;font-size:13px}
+    .review{padding:14px 0;border-top:1px solid #e5eaf1;direction:ltr;text-align:left}.review strong{display:block;line-height:1.5}.ok{color:var(--g)}.bad{color:var(--r)}.part{color:var(--o)}.note{background:#fff6dc;border-radius:10px;padding:10px;font-size:13px;color:#795400}
+    @media(max-width:450px){.card{padding:15px}h1{font-size:17px}.grid div,.stats div{font-size:12px}}
+  </style>
+</head>
+<body>
+<header>
+  <div class="top">
+    <div>
+      <h1 id="title">منصة Concours Mohammed</h1>
+      <p class="sub" id="sub">التحضير لمسابقة مفتشي الضرائب — موريتانيا</p>
+    </div>
+    <button class="lang" id="lang">Français</button>
+  </div>
+</header>
+
+<main>
+<section class="card" id="home">
+  <h2 id="homeTitle">امتحان تجريبي: مفتشو الضرائب</h2>
+  <p id="intro">ارفع ملفاتك المرجعية، ثم ابدأ امتحانًا من 60 سؤالًا بالفرنسية. مدة الامتحان ساعة واحدة، والنتيجة النهائية من 20.</p>
+
+  <div class="upload">
+    <b id="uploadTitle">رفع ملفات PDF المرجعية</b>
+    <input id="pdfFiles" type="file" accept="application/pdf" multiple>
+    <button class="primary" id="uploadBtn">رفع الملفات إلى المنصة</button>
+    <ul id="fileList"></ul>
+  </div>
+
+  <div class="grid">
+    <div><b>60</b><br><span id="ql">سؤالًا</span></div>
+    <div><b>01:00:00</b><br><span id="tl">المدة</span></div>
+    <div><b>/20</b><br><span id="gl">المعدل</span></div>
+  </div>
+
+  <p class="note" id="notice">الأسئلة الحالية تجريبية ومختلفة. بعد الرفع، تبقى ملفاتك محفوظة في المنصة لتُستخدم لاحقًا في توليد أسئلة من مراجعك.</p>
+  <button class="primary" style="margin-top:14px" id="start">ابدأ الامتحان</button>
+</section>
+
+<section class="card hidden" id="exam">
+  <div class="grid">
+    <div><b id="count">1 / 60</b><br><span id="countT">السؤال</span></div>
+    <div><b id="timer">01:00:00</b><br><span id="timerT">المتبقي</span></div>
+    <div><b id="done">0</b><br><span id="doneT">مجاب</span></div>
+  </div>
+  <div class="progress"><i id="bar"></i></div>
+  <div id="box"></div>
+  <div class="nav">
+    <button id="prev">السابق</button>
+    <button id="next">التالي</button>
+    <button class="green" id="send">إرسال وتصحيح</button>
+  </div>
+</section>
+
+<section class="card hidden" id="result">
+  <h2 id="resTitle">نتيجة الامتحان</h2>
+  <div class="score" id="grade">0.00 / 20</div>
+  <p id="raw" style="text-align:center"></p>
+  <div class="stats">
+    <div><b id="goodN">0</b><br><span id="goodT">صحيحة</span></div>
+    <div><b id="badN">0</b><br><span id="badT">خاطئة</span></div>
+    <div><b id="partN">0</b><br><span id="partT">جزئية</span></div>
+  </div>
+  <h3 id="detailsT">تفاصيل التصحيح</h3>
+  <div id="details"></div>
+  <button class="primary" id="again">إعادة امتحان جديد</button>
+</section>
+</main>
+
+<script>
+const SUPABASE_URL = "https://agqmifmzzbthskdhnsfh.supabase.co";
+const SUPABASE_KEY = "sb_publishable_PZFBrgRLTTlXzkWlC1oZYQ_lNBiDuop";
+const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+const L=["A","B","C","D"];
+const bank=[
+["Quelle est la capitale de la Mauritanie ?",["Nouadhibou","Nouakchott","Kiffa","Atar"],[1]],
+["Quel est le rôle principal de l'impôt ?",["Financer les dépenses publiques","Remplacer la monnaie","Créer les frontières","Supprimer les lois"],[0]],
+["Quels éléments sont des impôts directs ?",["Impôt sur le revenu","TVA","Impôt foncier","Droit de douane"],[0,2]],
+["La TVA est généralement :",["Un impôt indirect","Un impôt direct","Une subvention","Un prêt"],[0]],
+["Quels principes guident une administration fiscale ?",["Équité","Transparence","Arbitraire","Simplicité"],[0,1,3]],
+["Le budget de l'État présente :",["Recettes et dépenses publiques","Notes scolaires","Météo","Résultats sportifs"],[0]],
+["Les droits de douane concernent :",["Les marchandises importées ou exportées","Les salaires","Les diplômes","Les élections"],[0]],
+["Quelles sont des recettes fiscales ?",["TVA","Impôt sur le revenu","Dons privés","Droits de douane"],[0,1,3]],
+["L'assiette de l'impôt désigne :",["Le taux appliqué","La base de calcul","La date de paiement","Le lieu de travail"],[1]],
+["Le contrôle fiscal vise à :",["Vérifier les obligations fiscales","Distribuer des primes","Émettre des diplômes","Organiser des élections"],[0]],
+["Le contribuable est :",["La personne redevable de l'impôt","Un juge","Un enseignant","Un ministre uniquement"],[0]],
+["Le taux d'imposition est :",["Le pourcentage appliqué à la base","Le montant toujours fixe","Une date","Un document d'identité"],[0]],
+["Parmi les objectifs de la fiscalité figurent :",["Financement public","Redistribution","Stabilité économique","Suppression de l'État"],[0,1,2]],
+["Une déclaration fiscale sert à :",["Déterminer une obligation fiscale","Choisir une école","Voter","Demander un passeport"],[0]],
+["Le recouvrement de l'impôt est :",["La perception effective des sommes dues","La création d'un impôt","L'annulation systématique","La publication des lois"],[0]],
+["La fraude fiscale consiste notamment à :",["Échapper illégalement à l'impôt","Déclarer correctement","Payer à temps","Demander conseil"],[0]],
+["Quels actes peuvent faciliter le civisme fiscal ?",["Déclarer ses revenus","Conserver les justificatifs","Dissimuler les recettes","Payer dans les délais"],[0,1,3]],
+["Un impôt progressif signifie :",["Le taux augmente avec la base imposable","Le taux diminue toujours","Aucun taux n'existe","Il concerne seulement les entreprises"],[0]],
+["Le déficit budgétaire apparaît lorsque :",["Les dépenses dépassent les recettes","Les recettes dépassent les dépenses","Les deux sont nulles","Aucun budget n'existe"],[0]],
+["Une exonération fiscale est :",["Une dispense prévue par la loi","Une pénalité","Un contrôle","Une dette bancaire"],[0]],
+["Quel document prouve souvent une opération commerciale ?",["Une facture","Un bulletin météo","Un diplôme","Un passeport"],[0]],
+["La comptabilité permet notamment :",["De suivre les opérations financières","De remplacer la loi","D'émettre la monnaie","De supprimer les impôts"],[0]],
+["Quels éléments peuvent composer un dossier fiscal ?",["Déclarations","Factures","Justificatifs","Résultats sportifs"],[0,1,2]],
+["La taxe est généralement :",["Un prélèvement obligatoire","Un don volontaire","Un prêt personnel","Une amende uniquement"],[0]],
+["La base imposable peut être :",["Un revenu","Une valeur","Un bénéfice","Une couleur"],[0,1,2]],
+["Le principe de légalité fiscale veut que :",["L'impôt soit établi par la loi","Chaque agent crée ses impôts","L'impôt soit secret","Les taux soient aléatoires"],[0]],
+["La liquidation de l'impôt consiste à :",["Calculer le montant dû","Encaisser le paiement","Détruire le dossier","Créer une entreprise"],[0]],
+["Le paiement spontané signifie :",["Le contribuable paie sans relance","L'État annule la dette","Un juge paie","Le paiement est interdit"],[0]],
+["Les recettes non fiscales peuvent inclure :",["Revenus du domaine public","TVA","Impôt sur le revenu","Droits de douane"],[0]],
+["La dette publique correspond :",["Aux emprunts de l'État","Aux salaires privés","Aux notes scolaires","Aux impôts supprimés"],[0]],
+["Une pénalité fiscale peut être appliquée en cas de :",["Retard de déclaration","Respect des délais","Paiement correct","Dossier complet"],[0]],
+["Le secret professionnel impose à l'agent :",["De protéger les informations fiscales","De publier tous les dossiers","De vendre les données","D'ignorer les règles"],[0]],
+["Quels comportements renforcent la confiance fiscale ?",["Équité","Clarté des règles","Transparence","Favoritisme"],[0,1,2]],
+["Le produit intérieur brut mesure :",["La richesse produite sur un territoire","Le nombre de lois","Les impôts uniquement","La dette privée seule"],[0]],
+["L'inflation correspond :",["À une hausse générale des prix","À une baisse de toute production","À un impôt","À une loi"],[0]],
+["Une entreprise doit généralement :",["Tenir une comptabilité","Ignorer les factures","Dissimuler les ventes","Supprimer les justificatifs"],[0]],
+["Le bénéfice est souvent :",["La différence positive entre produits et charges","Un impôt","Une amende","Un document d'identité"],[0]],
+["La déclaration peut être :",["Annuelle","Périodique","Obligatoire selon la loi","Toujours facultative"],[0,1,2]],
+["Les administrations fiscales utilisent les contrôles pour :",["Détecter les irrégularités","Garantir l'équité","Vérifier les déclarations","Choisir des candidats sportifs"],[0,1,2]],
+["Un impôt proportionnel applique :",["Un même taux à la base","Un taux nécessairement croissant","Aucun taux","Un taux secret"],[0]],
+["Les charges publiques sont financées par :",["Les recettes publiques","Les dons personnels uniquement","Les notes des élèves","Les élections"],[0]],
+["La TVA est acquittée en pratique par :",["Le consommateur final","Seulement le juge","Seulement le maire","Le professeur"],[0]],
+["Une facture doit refléter :",["Une opération réelle","Une information inventée","Un vote","Un examen"],[0]],
+["Les droits d'enregistrement sont liés notamment :",["À certains actes juridiques","À la météo","Aux résultats scolaires","Aux visas uniquement"],[0]],
+["La politique budgétaire concerne :",["Recettes et dépenses de l'État","Les règles de sport","Les examens scolaires","La météo"],[0]],
+["Le recensement fiscal sert à :",["Identifier les contribuables","Supprimer les lois","Créer des passeports","Organiser des élections"],[0]],
+["La capacité contributive signifie :",["Aptitude économique à supporter l'impôt","Capacité à voter","Niveau sportif","Adresse postale"],[0]],
+["Quelles qualités sont attendues d'un inspecteur des impôts ?",["Intégrité","Rigueur","Confidentialité","Favoritisme"],[0,1,2]],
+["Un contrôle sur pièces s'effectue principalement :",["À partir des documents disponibles","Seulement dans la rue","Dans une école","Au tribunal uniquement"],[0]],
+["La prescription fiscale fixe :",["Un délai légal d'action","Un taux d'impôt","Une récompense","Une monnaie"],[0]],
+["Les voies de recours permettent :",["De contester une décision selon la loi","D'éviter toute règle","De créer un impôt","De supprimer les dossiers"],[0]],
+["Une taxe spécifique est souvent calculée :",["Par unité ou quantité","Toujours selon le revenu","Sans règle","Selon la météo"],[0]],
+["La conformité fiscale désigne :",["Le respect des obligations","La fraude","L'absence de déclarations","Le refus de paiement"],[0]],
+["Les dépenses publiques peuvent concerner :",["Santé","Éducation","Infrastructures","Uniquement les loisirs privés"],[0,1,2]],
+["La neutralité fiscale cherche à :",["Limiter les distorsions économiques","Favoriser arbitrairement","Supprimer tout impôt","Éviter les lois"],[0]],
+["Un redressement fiscal peut suivre :",["Une irrégularité constatée","Un paiement exact","Une déclaration complète","Une facture conforme"],[0]],
+["Une administration moderne privilégie :",["La numérisation","Le service aux usagers","La traçabilité","Le secret des règles"],[0,1,2]],
+["Le civisme fiscal est :",["Le respect volontaire et conscient des obligations","Une fraude","Un impôt supplémentaire","Une sanction"],[0]],
+["La justice fiscale vise notamment :",["Une répartition équitable de la charge","Un traitement arbitraire","L'absence de règles","Une dette privée"],[0]]
+];
