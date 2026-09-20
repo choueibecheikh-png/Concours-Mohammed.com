@@ -3,115 +3,189 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>رفع المذكرات — Concours Mohammed</title>
+<title>رفع المراجع — Concours Mohammed</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
 body{margin:0;background:#f3f6fb;color:#102a43;font-family:Arial,sans-serif}
-main{max-width:680px;margin:35px auto;padding:15px}
+main{max-width:720px;margin:35px auto;padding:15px}
 .card{background:#fff;padding:22px;border-radius:16px;box-shadow:0 5px 20px #0002}
 h1{font-size:22px;margin-top:0}
+h2{font-size:18px;margin-top:28px}
 .upload{border:2px dashed #155eef;border-radius:14px;padding:18px;background:#f8fbff;margin:18px 0}
-input{width:100%;margin:14px 0}
-button{background:#155eef;color:#fff;border:0;border-radius:10px;padding:12px 15px;font-size:15px;font-weight:bold;cursor:pointer}
+input[type="file"]{width:100%;margin:14px 0}
+button{background:#155eef;color:#fff;border:0;border-radius:10px;padding:12px 15px;font-size:15px;font-weight:bold;cursor:pointer;margin:4px 0}
 button.gray{background:#e8eff9;color:#123e75}
-li{background:#f2f5f9;margin:7px 0;padding:10px;border-radius:8px;direction:ltr;text-align:left;word-break:break-word}
-#message{padding:10px;border-radius:8px;background:#fff5d9;margin-top:12px}
+button.green{background:#087443}
+li{background:#f2f5f9;margin:7px 0;padding:12px;border-radius:8px;direction:ltr;text-align:left;word-break:break-word;display:flex;gap:10px;align-items:flex-start}
+li input{width:18px;height:18px;flex:0 0 auto;margin-top:1px}
+#message{padding:10px;border-radius:8px;background:#fff5d9;margin-top:12px;line-height:1.5}
+.actions{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0}
+.note{color:#486581;line-height:1.7;font-size:14px}
 </style>
 </head>
 <body>
 <main>
   <section class="card">
     <h1>رفع مذكرات PDF</h1>
-    <p>اختر ملفًا واحدًا أو عدة ملفات، ثم اضغط «رفع الملفات».</p>
+    <p class="note">ارفع مراجعك، ثم اختر الملفات التي تريد أن يعتمد عليها الامتحان التالي.</p>
 
     <div class="upload">
       <input id="files" type="file" accept="application/pdf" multiple>
-      <button id="upload">رفع الملفات</button>
+      <button id="upload" type="button">رفع الملفات</button>
       <p id="message">جاهز للرفع.</p>
     </div>
 
     <h2>الملفات المرفوعة</h2>
-    <button class="gray" id="refresh">تحديث القائمة</button>
+    <div class="actions">
+      <button class="gray" id="refresh" type="button">تحديث القائمة</button>
+      <button class="gray" id="selectAll" type="button">تحديد الكل</button>
+      <button class="gray" id="clearAll" type="button">إلغاء التحديد</button>
+    </div>
+
     <ul id="list"></ul>
 
-    <p><a href="index.html">العودة إلى الامتحان</a></p>
+    <button class="green" id="generate" type="button">إنشاء امتحان من الملفات المحددة</button>
+    <p class="note">لن يبدأ الامتحان إلا بعد اختيار ملف PDF واحد على الأقل.</p>
+
+    <p><a href="index.html">العودة إلى الصفحة الرئيسية</a></p>
   </section>
 </main>
 
 <script>
-const db=window.supabase.createClient(
+const db = window.supabase.createClient(
   "https://agqmifmzzbthskdhnsfh.supabase.co",
   "sb_publishable_PZFBrgRLTTlXzkWlC1oZYQ_lNBiDuop"
 );
 
-const input=document.getElementById("files");
-const message=document.getElementById("message");
-const list=document.getElementById("list");
+const input = document.getElementById("files");
+const message = document.getElementById("message");
+const list = document.getElementById("list");
+let currentFiles = [];
 
-function safe(text){
+function safe(text) {
   return String(text)
-    .replaceAll("&","&amp;")
-    .replaceAll("<","&lt;")
-    .replaceAll(">","&gt;");
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;");
 }
 
-async function showFiles(){
-  list.innerHTML="<li>جارٍ تحميل الملفات...</li>";
+function selectedNames() {
+  return [...document.querySelectorAll('input[name="reference"]:checked')]
+    .map(item => item.value);
+}
 
-  const {data,error}=await db.storage.from("references").list("",{
-    limit:100,
-    sortBy:{column:"created_at",order:"desc"}
+function renderFiles(files) {
+  const saved = new Set(JSON.parse(localStorage.getItem("selectedReferences") || "[]"));
+
+  if (!files.length) {
+    list.innerHTML = "<li>لا توجد ملفات PDF مرفوعة بعد.</li>";
+    return;
+  }
+
+  list.innerHTML = files.map(file => `
+    <li>
+      <input
+        type="checkbox"
+        name="reference"
+        value="${safe(file.name)}"
+        ${saved.has(file.name) ? "checked" : ""}
+      >
+      <span>PDF — ${safe(file.name)}</span>
+    </li>
+  `).join("");
+
+  list.querySelectorAll('input[name="reference"]').forEach(box => {
+    box.addEventListener("change", () => {
+      localStorage.setItem("selectedReferences", JSON.stringify(selectedNames()));
+    });
+  });
+}
+
+async function showFiles() {
+  list.innerHTML = "<li>جارٍ تحميل الملفات...</li>";
+
+  const { data, error } = await db.storage.from("references").list("", {
+    limit: 100,
+    sortBy: { column: "created_at", order: "desc" }
   });
 
-  if(error){
-    list.innerHTML="<li>خطأ: "+safe(error.message)+"</li>";
+  if (error) {
+    list.innerHTML = "<li>خطأ: " + safe(error.message) + "</li>";
     return;
   }
 
-  const pdfs=(data||[]).filter(file=>file.name.toLowerCase().endsWith(".pdf"));
-
-  if(!pdfs.length){
-    list.innerHTML="<li>لا توجد ملفات PDF مرفوعة بعد.</li>";
-    return;
-  }
-
-  list.innerHTML=pdfs.map(file=>"<li>PDF — "+safe(file.name)+"</li>").join("");
+  currentFiles = (data || []).filter(file => file.name.toLowerCase().endsWith(".pdf"));
+  renderFiles(currentFiles);
 }
 
-async function uploadFiles(){
-  const files=[...input.files];
+async function uploadFiles() {
+  const files = [...input.files];
 
-  if(!files.length){
-    message.textContent="اختر ملف PDF واحدًا على الأقل.";
+  if (!files.length) {
+    message.textContent = "اختر ملف PDF واحدًا على الأقل.";
     return;
   }
 
-  message.textContent="جارٍ الرفع...";
-  let success=0;
-  const errors=[];
+  message.textContent = "جارٍ رفع الملفات...";
+  let success = 0;
+  const errors = [];
 
-  for(const file of files){
-    const clean=file.name.replace(/[^a-zA-Z0-9._-]/g,"_");
-    const path="memo-"+Date.now()+"-"+Math.random().toString(36).slice(2,8)+"-"+clean;
+  for (const file of files) {
+    if (file.type !== "application/pdf") {
+      errors.push(file.name + ": ليس ملف PDF.");
+      continue;
+    }
 
-    const {error}=await db.storage
+    const clean = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+    const path = "memo-" + Date.now() + "-" +
+      Math.random().toString(36).slice(2, 8) + "-" + clean;
+
+    const { error } = await db.storage
       .from("references")
-      .upload(path,file,{contentType:"application/pdf",upsert:false});
+      .upload(path, file, { contentType: "application/pdf", upsert: false });
 
-    if(error) errors.push(file.name+": "+error.message);
+    if (error) errors.push(file.name + ": " + error.message);
     else success++;
   }
 
-  input.value="";
+  input.value = "";
   await showFiles();
 
-  message.textContent=errors.length
-    ? "تم رفع "+success+" ملف. الخطأ: "+errors.join(" | ")
-    : "تم رفع "+success+" ملف/ملفات بنجاح.";
+  message.textContent = errors.length
+    ? "تم رفع " + success + " ملف. الأخطاء: " + errors.join(" | ")
+    : "تم رفع " + success + " ملف/ملفات بنجاح.";
 }
 
-document.getElementById("upload").onclick=uploadFiles;
-document.getElementById("refresh").onclick=showFiles;
+document.getElementById("upload").addEventListener("click", uploadFiles);
+document.getElementById("refresh").addEventListener("click", showFiles);
+
+document.getElementById("selectAll").addEventListener("click", () => {
+  document.querySelectorAll('input[name="reference"]').forEach(box => {
+    box.checked = true;
+  });
+  localStorage.setItem("selectedReferences", JSON.stringify(selectedNames()));
+});
+
+document.getElementById("clearAll").addEventListener("click", () => {
+  document.querySelectorAll('input[name="reference"]').forEach(box => {
+    box.checked = false;
+  });
+  localStorage.removeItem("selectedReferences");
+});
+
+document.getElementById("generate").addEventListener("click", () => {
+  const chosen = selectedNames();
+
+  if (!chosen.length) {
+    message.textContent = "اختر ملف PDF واحدًا على الأقل قبل إنشاء الامتحان.";
+    return;
+  }
+
+  localStorage.setItem("selectedReferences", JSON.stringify(chosen));
+  window.location.href = "exam.html";
+});
+
 showFiles();
 </script>
 </body>
