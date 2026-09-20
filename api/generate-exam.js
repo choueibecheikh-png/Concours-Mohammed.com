@@ -19,58 +19,34 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { references = [], questionCount = 60 } = req.body || {};
-
-    if (!Array.isArray(references) || references.length === 0) {
-      return res.status(400).json({
-        error: "اختر ملف PDF واحدًا على الأقل."
-      });
-    }
-
+    const { questionCount = 60 } = req.body || {};
     const count = Math.min(Math.max(Number(questionCount) || 60, 10), 60);
 
     const prompt = `
 Tu es un concepteur expert d'examens pour la préparation au concours
 d'Inspecteur des Impôts en Mauritanie.
 
-Crée exactement ${count} questions à choix multiple en français, exclusivement
-à partir des documents PDF présents dans la base documentaire fournie.
+Utilise exclusivement les informations trouvées dans les documents de la
+base documentaire via l'outil file_search. Crée exactement ${count} questions
+à choix multiple en français.
 
 Exigences :
 - Répartis les questions entre les thèmes réellement présents dans les documents.
-- Ne fabrique aucune information absente des documents.
+- N'invente aucune information qui n'est pas dans les documents.
 - Évite les doublons, les questions vagues et les pièges inutiles.
-- Chaque question doit avoir 4 choix.
-- Certaines questions ont une seule bonne réponse et d'autres plusieurs bonnes réponses.
-- Donne une explication courte et exacte pour chaque réponse.
-- Attribue un poids positif à chaque question. La somme des poids doit être 20.
-- N'affiche pas les points à l'étudiant pendant l'examen.
-- Les noms de fichiers choisis par l'étudiant sont : ${references.join(", ")}.
-
-Réponds uniquement avec du JSON valide, sans Markdown, dans ce format exact :
-{
-  "questions": [
-    {
-      "text": "Question en français",
-      "type": "single",
-      "weight": 0.33,
-      "options": [
-        { "text": "Choix A", "correct": false },
-        { "text": "Choix B", "correct": true },
-        { "text": "Choix C", "correct": false },
-        { "text": "Choix D", "correct": false }
-      ],
-      "explanation": "Explication courte en français.",
-      "sources": ["nom-du-fichier.pdf"]
-    }
-  ]
-}
+- Chaque question contient exactement 4 choix.
+- "type" doit valoir "single" pour une seule bonne réponse, ou "multiple"
+  lorsqu'il y a plusieurs bonnes réponses.
+- Donne une explication courte, précise et fondée sur les documents.
+- Ajoute dans "sources" le nom du ou des PDF utilisés.
+- Donne un poids positif à chaque question, avec un total de 20 points.
+- N'affiche jamais les points à l'étudiant pendant l'examen.
 `;
 
     const response = await fetch("https://api.openai.com/v1/responses", {
       method: "POST",
       headers: {
-        "Authorization": `Bearer ${apiKey}`,
+        Authorization: `Bearer ${apiKey}`,
         "Content-Type": "application/json"
       },
       body: JSON.stringify({
@@ -79,10 +55,70 @@ Réponds uniquement avec du JSON valide, sans Markdown, dans ce format exact :
         tools: [
           {
             type: "file_search",
-            vector_store_ids: [vectorStoreId]
+            vector_store_ids: [vectorStoreId],
+            max_num_results: 20
           }
         ],
-        temperature: 0.25
+        text: {
+          format: {
+            type: "json_schema",
+            name: "exam_questions",
+            strict: true,
+            schema: {
+              type: "object",
+              additionalProperties: false,
+              required: ["questions"],
+              properties: {
+                questions: {
+                  type: "array",
+                  minItems: count,
+                  maxItems: count,
+                  items: {
+                    type: "object",
+                    additionalProperties: false,
+                    required: [
+                      "text",
+                      "type",
+                      "weight",
+                      "options",
+                      "explanation",
+                      "sources"
+                    ],
+                    properties: {
+                      text: { type: "string" },
+                      type: {
+                        type: "string",
+                        enum: ["single", "multiple"]
+                      },
+                      weight: { type: "number", exclusiveMinimum: 0 },
+                      options: {
+                        type: "array",
+                        minItems: 4,
+                        maxItems: 4,
+                        items: {
+                          type: "object",
+                          additionalProperties: false,
+                          required: ["text", "correct"],
+                          properties: {
+                            text: { type: "string" },
+                            correct: { type: "boolean" }
+                          }
+                        }
+                      },
+                      explanation: { type: "string" },
+                      sources: {
+                        type: "array",
+                        minItems: 1,
+                        items: { type: "string" }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        temperature: 0.2
       })
     });
 
@@ -95,34 +131,25 @@ Réponds uniquement avec du JSON valide, sans Markdown, dans ce format exact :
       });
     }
 
-    const text = data.output_text;
-
-    if (!text) {
+    if (!data.output_text) {
       return res.status(500).json({
         error: "لم يرجع الذكاء الاصطناعي نصًا قابلًا للاستخدام."
       });
     }
 
     let exam;
-
     try {
-      const cleanText = text
-        .replace(/^```json/i, "")
-        .replace(/^```/i, "")
-        .replace(/```$/i, "")
-        .trim();
-
-      exam = JSON.parse(cleanText);
+      exam = JSON.parse(data.output_text);
     } catch {
       return res.status(500).json({
-        error: "الذكاء الاصطناعي لم يرجع JSON صحيحًا.",
-        raw: text
+        error: "تعذر قراءة بيانات الامتحان التي تم إنشاؤها.",
+        raw: data.output_text
       });
     }
 
-    if (!Array.isArray(exam.questions) || exam.questions.length === 0) {
+    if (!Array.isArray(exam.questions) || exam.questions.length !== count) {
       return res.status(500).json({
-        error: "لم يتم توليد أي أسئلة صحيحة.",
+        error: "عدد الأسئلة الناتج غير صحيح.",
         raw: exam
       });
     }
