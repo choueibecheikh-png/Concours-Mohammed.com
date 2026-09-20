@@ -174,7 +174,8 @@ document.getElementById("clearAll").addEventListener("click", () => {
   localStorage.removeItem("selectedReferences");
 });
 
-document.getElementById("generate").addEventListener("click", () => {
+
+document.getElementById("generate").addEventListener("click", async () => {
   const chosen = selectedNames();
 
   if (!chosen.length) {
@@ -182,10 +183,36 @@ document.getElementById("generate").addEventListener("click", () => {
     return;
   }
 
-  localStorage.setItem("selectedReferences", JSON.stringify(chosen));
-  window.location.href = "exam.html";
-});
+  const generateButton = document.getElementById("generate");
+  generateButton.disabled = true;
+  message.textContent = "جارٍ تجهيز الامتحان من الملفات المحددة...";
 
+  try {
+    const response = await fetch("/api/generate-exam", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        references: chosen
+      })
+    });
+
+    const result = await response.json();
+
+    if (!response.ok || !result.ok) {
+      throw new Error(result.error || "تعذر تجهيز الامتحان.");
+    }
+
+    localStorage.setItem("selectedReferences", JSON.stringify(chosen));
+    message.textContent = "تم تجهيز الملفات بنجاح. جارٍ فتح صفحة الامتحان...";
+    window.location.href = "exam.html";
+
+  } catch (error) {
+    message.textContent = "خطأ: " + error.message;
+    generateButton.disabled = false;
+  }
+});
 showFiles();
 </script>
 </body>
