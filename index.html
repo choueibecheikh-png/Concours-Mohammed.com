@@ -48,6 +48,11 @@ body{margin:0;background:#f3f6fb;color:#102a43;font-family:Arial,sans-serif}head
 
 </main>
 <script>
+const supabase=window.supabase.createClient(
+  "https://agqmifmzzbthskdhnsfh.supabase.co",
+  "sb_publishable_PZFBrgRLTTlXzkWlC1oZYQ_lNBiDuop"
+);
+
 const bank=[
 ["Une entreprise comptabilise une charge sans pièce justificative. Quel est le risque fiscal le plus direct ?",["Rejet de la charge","Exonération automatique","Crédit de TVA","Prescription immédiate"],0],
 ["Une société omet volontairement une vente encaissée. Cette opération est principalement :",["Une erreur sans effet","Une dissimulation de recettes","Une exonération","Un amortissement"],1],
