@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>رفع المذكرات — Concours Mohammed</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+body{margin:0;background:#f3f6fb;color:#102a43;font-family:Arial,sans-serif}
+main{max-width:680px;margin:35px auto;padding:15px}
+.card{background:#fff;padding:22px;border-radius:16px;box-shadow:0 5px 20px #0002}
+h1{font-size:22px;margin-top:0}
+.upload{border:2px dashed #155eef;border-radius:14px;padding:18px;background:#f8fbff;margin:18px 0}
+input{width:100%;margin:14px 0}
+button{background:#155eef;color:#fff;border:0;border-radius:10px;padding:12px 15px;font-size:15px;font-weight:bold;cursor:pointer}
+button.gray{background:#e8eff9;color:#123e75}
+li{background:#f2f5f9;margin:7px 0;padding:10px;border-radius:8px;direction:ltr;text-align:left;word-break:break-word}
+#message{padding:10px;border-radius:8px;background:#fff5d9;margin-top:12px}
+</style>
+</head>
+<body>
+<main>
+  <section class="card">
+    <h1>رفع مذكرات PDF</h1>
+    <p>اختر ملفًا واحدًا أو عدة ملفات، ثم اضغط «رفع الملفات».</p>
+
+    <div class="upload">
+      <input id="files" type="file" accept="application/pdf" multiple>
+      <button id="upload">رفع الملفات</button>
+      <p id="message">جاهز للرفع.</p>
+    </div>
+
+    <h2>الملفات المرفوعة</h2>
+    <button class="gray" id="refresh">تحديث القائمة</button>
+    <ul id="list"></ul>
+
+    <p><a href="index.html">العودة إلى الامتحان</a></p>
+  </section>
+</main>
+
+<script>
+const db=window.supabase.createClient(
+  "https://agqmifmzzbthskdhnsfh.supabase.co",
+  "sb_publishable_PZFBrgRLTTlXzkWlC1oZYQ_lNBiDuop"
+);
+
+const input=document.getElementById("files");
+const message=document.getElementById("message");
+const list=document.getElementById("list");
+
+function safe(text){
+  return String(text)
+    .replaceAll("&","&amp;")
+    .replaceAll("<","&lt;")
+    .replaceAll(">","&gt;");
+}
+
+async function showFiles(){
+  list.innerHTML="<li>جارٍ تحميل الملفات...</li>";
+
+  const {data,error}=await db.storage.from("references").list("",{
+    limit:100,
+    sortBy:{column:"created_at",order:"desc"}
+  });
+
+  if(error){
+    list.innerHTML="<li>خطأ: "+safe(error.message)+"</li>";
+    return;
+  }
+
+  const pdfs=(data||[]).filter(file=>file.name.toLowerCase().endsWith(".pdf"));
+
+  if(!pdfs.length){
+    list.innerHTML="<li>لا توجد ملفات PDF مرفوعة بعد.</li>";
+    return;
+  }
+
+  list.innerHTML=pdfs.map(file=>"<li>PDF — "+safe(file.name)+"</li>").join("");
+}
+
+async function uploadFiles(){
+  const files=[...input.files];
+
+  if(!files.length){
+    message.textContent="اختر ملف PDF واحدًا على الأقل.";
+    return;
+  }
+
+  message.textContent="جارٍ الرفع...";
+  let success=0;
+  const errors=[];
+
+  for(const file of files){
+    const clean=file.name.replace(/[^a-zA-Z0-9._-]/g,"_");
+    const path="memo-"+Date.now()+"-"+Math.random().toString(36).slice(2,8)+"-"+clean;
+
+    const {error}=await db.storage
+      .from("references")
+      .upload(path,file,{contentType:"application/pdf",upsert:false});
+
+    if(error) errors.push(file.name+": "+error.message);
+    else success++;
+  }
+
+  input.value="";
+  await showFiles();
+
+  message.textContent=errors.length
+    ? "تم رفع "+success+" ملف. الخطأ: "+errors.join(" | ")
+    : "تم رفع "+success+" ملف/ملفات بنجاح.";
+}
+
+document.getElementById("upload").onclick=uploadFiles;
+document.getElementById("refresh").onclick=showFiles;
+showFiles();
+</script>
+</body>
+</html>
