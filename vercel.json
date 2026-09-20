@@ -1,8 +1,0 @@
-{
-  "version": 2,
-  "functions": {
-    "api/generate-exam.js": {
-      "runtime": "nodejs22.x"
-    }
-  }
-}
