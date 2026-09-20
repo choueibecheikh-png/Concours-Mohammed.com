@@ -1,0 +1,425 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>الامتحان — Concours Mohammed</title>
+  <style>
+    :root{
+      --blue:#155eef;
+      --dark:#102a43;
+      --bg:#f3f6fb;
+      --green:#087443;
+      --red:#b42318;
+      --orange:#b54708;
+      --line:#d9e2ec;
+    }
+    *{box-sizing:border-box}
+    body{margin:0;background:var(--bg);color:var(--dark);font-family:Arial,sans-serif}
+    main{max-width:860px;margin:28px auto;padding:14px}
+    .card{background:#fff;padding:20px;border-radius:16px;box-shadow:0 5px 20px #0002}
+    h1{margin:0;font-size:23px}
+    h2{font-size:18px}
+    p{line-height:1.65}
+    button{border:0;border-radius:10px;padding:12px 15px;font-size:15px;font-weight:bold;cursor:pointer;background:var(--blue);color:#fff}
+    button.gray{background:#e8eff9;color:#123e75}
+    button.green{background:var(--green)}
+    button.red{background:var(--red)}
+    button:disabled{opacity:.55;cursor:not-allowed}
+    .hidden{display:none!important}
+    .top{display:flex;gap:10px;flex-wrap:wrap;align-items:center;justify-content:space-between;margin:14px 0}
+    .badge{background:#eaf1ff;color:#123e75;padding:10px 12px;border-radius:10px;font-weight:bold}
+    #timer{direction:ltr;color:#b42318}
+    .question{direction:ltr;text-align:left;border:1px solid var(--line);border-radius:13px;padding:16px;margin:14px 0;background:#fff}
+    .question h3{margin:0 0 8px;font-size:17px;line-height:1.55}
+    .instruction{margin:0 0 12px;color:#52667a;font-size:13px;font-style:italic}
+    .option{display:flex;direction:ltr;text-align:left;align-items:flex-start;gap:9px;border:1px solid #d9e2ec;border-radius:9px;padding:10px;margin:8px 0;cursor:pointer}
+    .option:hover{background:#f7faff;border-color:#8db6ff}
+    .option input{width:18px;height:18px;margin-top:1px;accent-color:var(--blue)}
+    .option.correct{background:#eaf9ef;border-color:#75d596;color:#075c32}
+    .option.wrong{background:#fff0ef;border-color:#f4a5a1;color:#9d1c17}
+    .option.missed{background:#fff7e7;border-color:#f6c76b;color:#8a5500}
+    .notice{padding:12px;border-radius:10px;background:#fff5d9;color:#7a5300;margin:14px 0;line-height:1.6}
+    .summary{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:18px 0}
+    .stat{padding:14px;text-align:center;border-radius:12px;background:#f4f7fb}
+    .stat strong{display:block;font-size:22px;margin-top:5px}
+    .score{font-size:34px;color:var(--green);font-weight:bold;text-align:center;margin:16px 0}
+    .actions{display:flex;gap:9px;flex-wrap:wrap;margin-top:16px}
+    .explanation{font-size:14px;color:#38536d;margin:11px 0 0;line-height:1.6}
+    @media(max-width:600px){
+      .summary{grid-template-columns:1fr}
+      button{width:100%}
+    }
+  </style>
+</head>
+<body>
+<main>
+
+  <section class="card" id="startScreen">
+    <h1>امتحان تجريبي</h1>
+    <p id="selectedText">جارٍ التحقق من الملفات المختارة...</p>
+    <div id="startNotice" class="notice hidden"></div>
+    <button id="startButton" class="green" type="button">بدء الامتحان</button>
+    <p><a href="upload.html">العودة لاختيار المراجع</a></p>
+  </section>
+
+  <section class="card hidden" id="examScreen">
+    <div class="top">
+      <h1>الامتحان التجريبي</h1>
+      <div class="badge" id="timer">01:00:00</div>
+    </div>
+
+    <p class="notice">الأسئلة باللغة الفرنسية. لا تظهر نقاط الأسئلة إلا بعد التصحيح النهائي.</p>
+    <div id="questions"></div>
+
+    <button id="submitButton" class="green" type="button">تصحيح الامتحان وإظهار النتيجة</button>
+  </section>
+
+  <section class="card hidden" id="resultScreen">
+    <h1>نتيجة الامتحان</h1>
+    <div id="score" class="score">0 / 20</div>
+    <p id="resultText"></p>
+
+    <div class="summary">
+      <div class="stat">إجابات صحيحة<strong id="correctCount">0</strong></div>
+      <div class="stat">إجابات خاطئة<strong id="wrongCount">0</strong></div>
+      <div class="stat">غير مجاب عنها<strong id="blankCount">0</strong></div>
+    </div>
+
+    <p class="notice">
+      التصحيح: الأخضر إجابة صحيحة، الأحمر إجابة اخترتها وهي خاطئة،
+      والأصفر إجابة صحيحة لم تخترها.
+    </p>
+
+    <div id="correction"></div>
+
+    <div class="actions">
+      <button id="retryButton" type="button">إعادة امتحان جديد</button>
+      <button id="referencesButton" class="gray" type="button">العودة إلى المراجع</button>
+      <button id="homeButton" class="gray" type="button">الصفحة الرئيسية</button>
+    </div>
+  </section>
+
+</main>
+
+<script>
+const selectedReferences = JSON.parse(localStorage.getItem("selectedReferences") || "[]");
+
+const sourceQuestions = [
+  {
+    text:"La TVA est principalement un impôt :",
+    type:"single",
+    options:[
+      {text:"indirect sur la consommation",correct:true},
+      {text:"réservé aux seuls salariés",correct:false},
+      {text:"perçu uniquement par les communes",correct:false},
+      {text:"supprimé lors de toute importation",correct:false}
+    ],
+    explanation:"La TVA est un impôt indirect appliqué à la consommation de biens et de services."
+  },
+  {
+    text:"Parmi les principes budgétaires classiques, on trouve :",
+    type:"multiple",
+    options:[
+      {text:"L'annualité",correct:true},
+      {text:"L'unité",correct:true},
+      {text:"L'universalité",correct:true},
+      {text:"L'absence de contrôle",correct:false}
+    ],
+    explanation:"Les principes classiques comprennent notamment l'annualité, l'unité et l'universalité."
+  },
+  {
+    text:"Le recouvrement de l'impôt correspond à :",
+    type:"single",
+    options:[
+      {text:"La perception effective de la somme due",correct:true},
+      {text:"La rédaction de la Constitution",correct:false},
+      {text:"La création d'une entreprise privée",correct:false},
+      {text:"Le vote d'une loi étrangère",correct:false}
+    ],
+    explanation:"Le recouvrement est l'étape qui vise à obtenir le paiement de l'impôt."
+  },
+  {
+    text:"Le contribuable doit notamment :",
+    type:"multiple",
+    options:[
+      {text:"Déclarer les éléments imposables",correct:true},
+      {text:"Conserver les justificatifs nécessaires",correct:true},
+      {text:"Respecter les délais de paiement",correct:true},
+      {text:"Modifier lui-même la loi fiscale",correct:false}
+    ],
+    explanation:"Le contribuable déclare, justifie ses informations et paie dans les délais prévus."
+  },
+  {
+    text:"La Constitution est :",
+    type:"single",
+    options:[
+      {text:"La norme juridique suprême de l'État",correct:true},
+      {text:"Un simple contrat commercial",correct:false},
+      {text:"Un document sans effet juridique",correct:false},
+      {text:"Une décision prise par une entreprise",correct:false}
+    ],
+    explanation:"La Constitution occupe le sommet de la hiérarchie des normes."
+  },
+  {
+    text:"Un contrôle fiscal doit respecter :",
+    type:"multiple",
+    options:[
+      {text:"Le principe de légalité",correct:true},
+      {text:"Les droits de la défense",correct:true},
+      {text:"La confidentialité des informations",correct:true},
+      {text:"Une décision arbitraire",correct:false}
+    ],
+    explanation:"L'administration fiscale doit respecter la loi, les garanties du contribuable et la confidentialité."
+  },
+  {
+    text:"Le budget de l'État présente :",
+    type:"single",
+    options:[
+      {text:"Les prévisions de recettes et de dépenses",correct:true},
+      {text:"Seulement les dépenses privées",correct:false},
+      {text:"Seulement les impôts locaux",correct:false},
+      {text:"Une liste de candidats à un concours",correct:false}
+    ],
+    explanation:"Le budget prévoit les ressources et les charges de l'État pour une période donnée."
+  },
+  {
+    text:"Les recettes publiques peuvent comprendre :",
+    type:"multiple",
+    options:[
+      {text:"Les impôts",correct:true},
+      {text:"Les taxes",correct:true},
+      {text:"Les droits de douane",correct:true},
+      {text:"Les décisions sans base légale",correct:false}
+    ],
+    explanation:"Les impôts, taxes et droits de douane font partie des recettes publiques."
+  },
+  {
+    text:"Un acte administratif unilatéral est pris :",
+    type:"single",
+    options:[
+      {text:"Par une autorité administrative",correct:true},
+      {text:"Uniquement par une personne privée",correct:false},
+      {text:"Toujours par un tribunal pénal",correct:false},
+      {text:"Sans aucune règle de droit",correct:false}
+    ],
+    explanation:"Il s'agit d'une décision adoptée unilatéralement par une autorité administrative."
+  },
+  {
+    text:"Le service public doit notamment respecter :",
+    type:"multiple",
+    options:[
+      {text:"La continuité",correct:true},
+      {text:"L'égalité des usagers",correct:true},
+      {text:"L'intérêt général",correct:true},
+      {text:"La discrimination sans motif légal",correct:false}
+    ],
+    explanation:"Les principes du service public incluent la continuité, l'égalité et l'intérêt général."
+  }
+];
+
+let questions = [];
+let remainingSeconds = 3600;
+let timer = null;
+let corrected = false;
+
+function shuffle(array){
+  const copy = [...array];
+  for(let i = copy.length - 1; i > 0; i--){
+    const j = Math.floor(Math.random() * (i + 1));
+    [copy[i],copy[j]] = [copy[j],copy[i]];
+  }
+  return copy;
+}
+
+function makeExam(){
+  const result = [];
+  for(let i = 0; i < 60; i++){
+    const base = sourceQuestions[i % sourceQuestions.length];
+    result.push({
+      id:i + 1,
+      text:base.text,
+      type:base.type,
+      options:shuffle(base.options.map(option => ({...option}))),
+      explanation:base.explanation
+    });
+  }
+  questions = shuffle(result);
+}
+
+function renderQuestions(){
+  const container = document.getElementById("questions");
+
+  container.innerHTML = questions.map((question, index) => {
+    const inputType = question.type === "multiple" ? "checkbox" : "radio";
+    const instruction = question.type === "multiple"
+      ? "Plusieurs réponses sont possibles."
+      : "Choisissez une seule réponse.";
+
+    return `
+      <article class="question" data-question="${index}">
+        <h3>${index + 1}. ${question.text}</h3>
+        <p class="instruction">${instruction}</p>
+        ${question.options.map((option, optionIndex) => `
+          <label class="option" data-option="${optionIndex}">
+            <input
+              type="${inputType}"
+              name="question-${index}"
+              value="${optionIndex}"
+            >
+            <span><strong>${String.fromCharCode(65 + optionIndex)}.</strong> ${option.text}</span>
+          </label>
+        `).join("")}
+      </article>
+    `;
+  }).join("");
+}
+
+function showTime(){
+  const hours = Math.floor(remainingSeconds / 3600);
+  const minutes = Math.floor((remainingSeconds % 3600) / 60);
+  const seconds = remainingSeconds % 60;
+
+  document.getElementById("timer").textContent =
+    String(hours).padStart(2,"0") + ":" +
+    String(minutes).padStart(2,"0") + ":" +
+    String(seconds).padStart(2,"0");
+}
+
+function startTimer(){
+  showTime();
+
+  timer = setInterval(() => {
+    remainingSeconds--;
+    showTime();
+
+    if(remainingSeconds <= 0){
+      clearInterval(timer);
+      correctExam(true);
+    }
+  },1000);
+}
+
+function startExam(){
+  if(!selectedReferences.length) return;
+
+  makeExam();
+  renderQuestions();
+  remainingSeconds = 3600;
+  corrected = false;
+
+  document.getElementById("startScreen").classList.add("hidden");
+  document.getElementById("examScreen").classList.remove("hidden");
+
+  startTimer();
+  window.scrollTo({top:0,behavior:"smooth"});
+}
+
+function selectedForQuestion(index){
+  return [...document.querySelectorAll(`input[name="question-${index}"]:checked`)]
+    .map(input => Number(input.value));
+}
+
+function sameAnswers(a,b){
+  if(a.length !== b.length) return false;
+  const first = [...a].sort((x,y) => x-y);
+  const second = [...b].sort((x,y) => x-y);
+  return first.every((value,index) => value === second[index]);
+}
+
+function correctExam(timeOver=false){
+  if(corrected) return;
+  corrected = true;
+  clearInterval(timer);
+
+  let correct = 0;
+  let wrong = 0;
+  let blank = 0;
+
+  questions.forEach((question, index) => {
+    const selected = selectedForQuestion(index);
+    const right = question.options
+      .map((option, optionIndex) => option.correct ? optionIndex : null)
+      .filter(value => value !== null);
+
+    if(!selected.length) blank++;
+    else if(sameAnswers(selected,right)) correct++;
+    else wrong++;
+  });
+
+  const score = Math.max(0, (correct / questions.length) * 20).toFixed(2);
+
+  document.getElementById("score").textContent = score + " / 20";
+  document.getElementById("correctCount").textContent = correct;
+  document.getElementById("wrongCount").textContent = wrong;
+  document.getElementById("blankCount").textContent = blank;
+  document.getElementById("resultText").textContent = timeOver
+    ? "انتهت مدة الساعة، وتم تصحيح إجاباتك تلقائيًا."
+    : "تم تصحيح إجاباتك. يظهر التصحيح التفصيلي أدناه.";
+
+  renderCorrection();
+
+  document.getElementById("examScreen").classList.add("hidden");
+  document.getElementById("resultScreen").classList.remove("hidden");
+  window.scrollTo({top:0,behavior:"smooth"});
+}
+
+function renderCorrection(){
+  const correction = document.getElementById("correction");
+
+  correction.innerHTML = questions.map((question, index) => {
+    const selected = selectedForQuestion(index);
+
+    const options = question.options.map((option, optionIndex) => {
+      const isSelected = selected.includes(optionIndex);
+      let className = "option";
+
+      if(option.correct && isSelected) className += " correct";
+      else if(!option.correct && isSelected) className += " wrong";
+      else if(option.correct && !isSelected) className += " missed";
+
+      return `
+        <div class="${className}">
+          <span><strong>${String.fromCharCode(65 + optionIndex)}.</strong> ${option.text}</span>
+        </div>
+      `;
+    }).join("");
+
+    return `
+      <article class="question">
+        <h3>${index + 1}. ${question.text}</h3>
+        ${options}
+        <p class="explanation"><strong>Explication :</strong> ${question.explanation}</p>
+      </article>
+    `;
+  }).join("");
+}
+
+document.getElementById("startButton").addEventListener("click", startExam);
+document.getElementById("submitButton").addEventListener("click", () => correctExam(false));
+document.getElementById("retryButton").addEventListener("click", () => {
+  window.location.href = "upload.html";
+});
+document.getElementById("referencesButton").addEventListener("click", () => {
+  window.location.href = "upload.html";
+});
+document.getElementById("homeButton").addEventListener("click", () => {
+  window.location.href = "index.html";
+});
+
+const selectedText = document.getElementById("selectedText");
+const notice = document.getElementById("startNotice");
+
+if(!selectedReferences.length){
+  selectedText.textContent = "لم يتم اختيار أي ملف مرجعي بعد.";
+  notice.textContent = "ارجع إلى صفحة رفع المراجع، حدّد ملف PDF واحدًا على الأقل، ثم اضغط إنشاء امتحان.";
+  notice.classList.remove("hidden");
+  document.getElementById("startButton").disabled = true;
+}else{
+  selectedText.textContent =
+    "سيُبنى الامتحان القادم من الملفات المحددة: " +
+    selectedReferences.join("، ") + ".";
+}
+</script>
+</body>
+</html>
