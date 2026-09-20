@@ -157,3 +157,305 @@ const bank=[
 ["Le civisme fiscal est :",["Le respect volontaire et conscient des obligations","Une fraude","Un impôt supplémentaire","Une sanction"],[0]],
 ["La justice fiscale vise notamment :",["Une répartition équitable de la charge","Un traitement arbitraire","L'absence de règles","Une dette privée"],[0]]
 ];
+const weights=[
+0.2,0.3,0.4,0.2,0.3,0.4,0.2,0.3,0.4,0.2,
+0.3,0.4,0.2,0.3,0.4,0.2,0.3,0.4,0.2,0.3,
+0.4,0.2,0.3,0.4,0.2,0.3,0.4,0.2,0.3,0.4,
+0.2,0.3,0.4,0.2,0.3,0.4,0.2,0.3,0.4,0.2,
+0.3,0.4,0.2,0.3,0.4,0.2,0.3,0.4,0.2,0.3,
+0.4,0.2,0.3,0.4,0.2,0.3,0.4,0.2,0.3,0.4
+];
+
+let q=[],ans=[],cur=0,sec=3600,clock=null,fr=false;
+
+function showFiles(names){
+  document.getElementById("fileList").innerHTML=
+    names.map(x=>`<li class="file">PDF ✓ ${x}</li>`).join("");
+}
+
+document.getElementById("uploadBtn").onclick=async()=>{
+  const files=[...document.getElementById("pdfFiles").files];
+
+  if(!files.length){
+    alert(fr?"Sélectionnez au moins un PDF.":"اختر ملف PDF واحدًا على الأقل.");
+    return;
+  }
+
+  showFiles(files.map(f=>f.name));
+
+  const button=document.getElementById("uploadBtn");
+  button.textContent=fr?"Téléversement...":"جارٍ الرفع...";
+  button.disabled=true;
+
+  try{
+    for(const file of files){
+      const safeName=file.name.replace(/[^a-zA-Z0-9._-]/g,"_");
+      const path=`${Date.now()}-${safeName}`;
+
+      const {error: uploadError}=await db.storage
+        .from("references")
+        .upload(path,file,{contentType:"application/pdf"});
+
+      if(uploadError) throw uploadError;
+
+      const {error: dbError}=await db
+        .from("references")
+        .insert({file_name:file.name,storage_path:path});
+
+      if(dbError) throw dbError;
+    }
+
+    alert(fr?"Fichiers enregistrés avec succès.":"تم رفع الملفات وحفظها بنجاح.");
+  }catch(error){
+    alert((fr?"Erreur : ":"خطأ: ")+error.message);
+  }
+
+  button.textContent=fr?"Téléverser les fichiers":"رفع الملفات إلى المنصة";
+  button.disabled=false;
+};
+
+function start(){
+  q=bank.map((x,i)=>({
+    text:x[0],
+    opts:x[1],
+    correct:x[2],
+    weight:weights[i]
+  }));
+
+  ans=Array.from({length:60},()=>[]);
+  cur=0;
+  sec=3600;
+
+  document.getElementById("home").classList.add("hidden");
+  document.getElementById("exam").classList.remove("hidden");
+
+  render();
+  tick();
+  clock=setInterval(tick,1000);
+}
+
+function render(){
+  const x=q[cur];
+  const multi=x.correct.length>1;
+
+  document.getElementById("count").textContent=`${cur+1} / 60`;
+  document.getElementById("done").textContent=ans.filter(a=>a.length).length;
+  document.getElementById("bar").style.width=((cur+1)/60*100)+"%";
+
+  document.getElementById("prev").disabled=cur===0;
+  document.getElementById("next").disabled=cur===59;
+
+  const hint=multi
+    ? (fr?"Plusieurs réponses peuvent être correctes.":"قد تكون عدة إجابات صحيحة.")
+    : (fr?"Choisissez une réponse.":"اختر إجابة واحدة.");
+
+  document.getElementById("box").innerHTML=
+    `<div class="question">${cur+1}. ${x.text}</div>
+     <div class="hint">${hint}</div>`+
+    x.opts.map((v,i)=>
+      `<label class="option">
+        <input type="${multi?"checkbox":"radio"}" name="a" value="${i}" ${ans[cur].includes(i)?"checked":""}>
+        ${L[i]}) ${v}
+      </label>`
+    ).join("");
+
+  document.querySelectorAll('input[name="a"]').forEach(element=>{
+    element.onchange=()=>{
+      if(multi){
+        ans[cur]=[...document.querySelectorAll('input[name="a"]:checked')]
+          .map(item=>Number(item.value));
+      }else{
+        ans[cur]=[Number(element.value)];
+      }
+
+      document.getElementById("done").textContent=
+        ans.filter(a=>a.length).length;
+    };
+  });
+}
+
+function tick(){
+  sec--;
+
+  const h=Math.floor(sec/3600);
+  const m=Math.floor((sec%3600)/60);
+  const s=sec%60;
+
+  document.getElementById("timer").textContent=
+    [h,m,s].map(x=>String(x).padStart(2,"0")).join(":");
+
+  if(sec<=0){
+    clearInterval(clock);
+    finish(true);
+  }
+}
+
+function finish(expired=false){
+  clearInterval(clock);
+
+  let total=0;
+  let got=0;
+  let goodCount=0;
+  let badCount=0;
+  let partialCount=0;
+  let html="";
+
+  q.forEach((x,i)=>{
+    total+=x.weight;
+
+    const rightChosen=ans[i].filter(v=>x.correct.includes(v)).length;
+    const wrongChosen=ans[i].filter(v=>!x.correct.includes(v)).length;
+
+    const points=Math.max(
+      0,
+      (x.weight/x.correct.length)*(rightChosen-wrongChosen)
+    );
+
+    got+=points;
+
+    const state=points===x.weight ? "ok" : points===0 ? "bad" : "part";
+
+    if(state==="ok") goodCount++;
+    else if(state==="bad") badCount++;
+    else partialCount++;
+
+    html+=`
+      <div class="review">
+        <strong>${i+1}. ${x.text}</strong>
+        <span class="${state}">
+          ${fr?"Votre score : ":"نقطتك: "}
+          ${points.toFixed(2)} / ${x.weight.toFixed(2)}
+        </span>
+        <br>
+        <small>
+          ${fr?"Bonnes réponses : ":"الإجابات الصحيحة: "}
+          ${x.correct.map(n=>L[n]+") "+x.opts[n]).join(" | ")}
+        </small>
+      </div>
+    `;
+  });
+
+  const grade=(got/total)*20;
+
+  document.getElementById("exam").classList.add("hidden");
+  document.getElementById("result").classList.remove("hidden");
+
+  document.getElementById("grade").textContent=
+    `${grade.toFixed(2)} / 20`;
+
+  document.getElementById("raw").textContent=
+    (fr?"Score brut : ":"مجموع النقاط: ")+
+    `${got.toFixed(2)} / ${total.toFixed(2)}`+
+    (expired ? (fr?" — Temps écoulé.":" — انتهى الوقت.") : "");
+
+  document.getElementById("goodN").textContent=goodCount;
+  document.getElementById("badN").textContent=badCount;
+  document.getElementById("partN").textContent=partialCount;
+  document.getElementById("details").innerHTML=html;
+}
+
+function setLang(){
+  fr=!fr;
+
+  document.documentElement.lang=fr?"fr":"ar";
+  document.documentElement.dir=fr?"ltr":"rtl";
+
+  const t=fr ? {
+    title:"Plateforme Concours Mohammed",
+    sub:"Préparation au concours des Inspecteurs des Impôts — Mauritanie",
+    homeTitle:"Examen blanc : Inspecteurs des Impôts",
+    intro:"Téléversez vos PDF de référence, puis commencez un examen de 60 questions en français. Durée : une heure. Note sur 20.",
+    uploadTitle:"Téléverser les PDF de référence",
+    ql:"questions",
+    tl:"Durée",
+    gl:"Note",
+    notice:"Les 60 questions actuelles sont distinctes et servent à l'entraînement. Vos PDF sont enregistrés pour une future génération basée sur vos références.",
+    start:"Commencer l'examen",
+    countT:"Question",
+    timerT:"Restant",
+    doneT:"Répondues",
+    prev:"Précédent",
+    next:"Suivant",
+    send:"Soumettre et corriger",
+    resTitle:"Résultat de l'examen",
+    goodT:"Correctes",
+    badT:"Fausses",
+    partT:"Partielles",
+    detailsT:"Détails de la correction",
+    again:"Recommencer un examen",
+    upload:"Téléverser les fichiers"
+  } : {
+    title:"منصة Concours Mohammed",
+    sub:"التحضير لمسابقة مفتشي الضرائب — موريتانيا",
+    homeTitle:"امتحان تجريبي: مفتشو الضرائب",
+    intro:"ارفع ملفاتك المرجعية، ثم ابدأ امتحانًا من 60 سؤالًا بالفرنسية. مدة الامتحان ساعة واحدة، والنتيجة النهائية من 20.",
+    uploadTitle:"رفع ملفات PDF المرجعية",
+    ql:"سؤالًا",
+    tl:"المدة",
+    gl:"المعدل",
+    notice:"الأسئلة الـ60 الحالية مختلفة وتصلح للتدريب. ستُحفظ ملفاتك لاستعمالها لاحقًا في توليد أسئلة من مراجعك.",
+    start:"ابدأ الامتحان",
+    countT:"السؤال",
+    timerT:"المتبقي",
+    doneT:"مجاب",
+    prev:"السابق",
+    next:"التالي",
+    send:"إرسال وتصحيح",
+    resTitle:"نتيجة الامتحان",
+    goodT:"صحيحة",
+    badT:"خاطئة",
+    partT:"جزئية",
+    detailsT:"تفاصيل التصحيح",
+    again:"إعادة امتحان جديد",
+    upload:"رفع الملفات إلى المنصة"
+  };
+
+  [
+    "title","sub","homeTitle","intro","uploadTitle","ql","tl","gl",
+    "notice","start","countT","timerT","doneT","prev","next","send",
+    "resTitle","goodT","badT","partT","detailsT","again"
+  ].forEach(id=>{
+    document.getElementById(id).textContent=t[id];
+  });
+
+  document.getElementById("uploadBtn").textContent=t.upload;
+  document.getElementById("lang").textContent=fr?"العربية":"Français";
+
+  if(!document.getElementById("exam").classList.contains("hidden")){
+    render();
+  }
+}
+
+document.getElementById("start").onclick=start;
+
+document.getElementById("prev").onclick=()=>{
+  if(cur>0){
+    cur--;
+    render();
+  }
+};
+
+document.getElementById("next").onclick=()=>{
+  if(cur<59){
+    cur++;
+    render();
+  }
+};
+
+document.getElementById("send").onclick=()=>{
+  const message=fr
+    ?"Soumettre vos réponses et corriger maintenant ?"
+    :"هل تريد إرسال إجاباتك وتصحيح الامتحان الآن؟";
+
+  if(confirm(message)) finish();
+};
+
+document.getElementById("again").onclick=()=>{
+  document.getElementById("result").classList.add("hidden");
+  document.getElementById("home").classList.remove("hidden");
+};
+
+document.getElementById("lang").onclick=setLang;
+</script>
+</body>
+</html>
